@@ -62,7 +62,7 @@ const Index = () => {
                 <CardTitle>Add Your Shifts</CardTitle>
               </CardHeader>
               <CardContent>
-                <ShiftForm onAddShift={handleAddShift} />
+                <ShiftForm onAddShift={handleAddShift} shifts={shifts} />
               </CardContent>
             </Card>
 
