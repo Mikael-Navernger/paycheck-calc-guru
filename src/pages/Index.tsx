@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { WorkShift, calculateTotalPay, PayCalculation } from "@/utils/payCalculator";
 import ShiftForm from "@/components/ShiftForm";
@@ -9,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Percent } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [shifts, setShifts] = useState<WorkShift[]>([]);
   const [taxPercentage, setTaxPercentage] = useState<number>(35);
   const [calculation, setCalculation] = useState<PayCalculation | null>(null);
+  const { toast } = useToast();
 
   const handleAddShift = (shift: WorkShift) => {
     const updatedShifts = [...shifts, shift];

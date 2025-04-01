@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format, addDays } from "date-fns";
-import { Calendar as CalendarIcon, Plus, Copy, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Copy, Clock, ClipboardPaste } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -36,6 +36,8 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShiftFormProps {
   onAddShift: (shift: WorkShift) => void;
@@ -54,6 +56,7 @@ const ShiftForm: React.FC<ShiftFormProps> = ({ onAddShift, shifts }) => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState<string>("08:00");
   const [endTime, setEndTime] = useState<string>("16:00");
+  const { toast } = useToast();
 
   // State for batch shift adding
   const [batchDates, setBatchDates] = useState<Date[]>([]);
@@ -144,46 +147,113 @@ const ShiftForm: React.FC<ShiftFormProps> = ({ onAddShift, shifts }) => {
   };
 
   const parseTextImport = () => {
-    // Very basic parsing of text that might contain dates and times
-    const lines = importText.split("\n");
+    if (!importText.trim()) {
+      toast({
+        title: "No text to parse",
+        description: "Please paste your shift data first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Split input text into lines
+    const lines = importText.trim().split("\n");
+    const successfulShifts: WorkShift[] = [];
+    const failedLines: string[] = [];
     
-    const shifts: WorkShift[] = [];
-    const dateRegex = /(\d{1,2})[\/\.-](\d{1,2})[\/\.-]?(\d{0,4})/;
-    const timeRegex = /(\d{1,2})[:\.](\d{2})\s*[-–—to]+\s*(\d{1,2})[:\.](\d{2})/;
+    // This regex matches various formats including tab/space separated values 
+    // and various time separators (-, ~, :)
+    // Format: [optional number] DD.MM.YYYY HH:MM-HH:MM [optional extra text]
+    const shiftRegex = /^(?:\d+\s+)?(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})\s+(\d{1,2})[:\.](\d{2})[\-\~](\d{1,2})[:\.](\d{2})(?:\s+.*)?$/;
     
-    lines.forEach(line => {
-      const dateMatch = line.match(dateRegex);
-      const timeMatch = line.match(timeRegex);
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return; // Skip empty lines
       
-      if (dateMatch && timeMatch) {
-        let day = parseInt(dateMatch[1]);
-        let month = parseInt(dateMatch[2]) - 1; // JavaScript months are 0-indexed
-        let year = dateMatch[3] ? parseInt(dateMatch[3]) : new Date().getFullYear();
-        if (year < 100) year += 2000; // Convert 2-digit year to 4-digit
-        
-        const startHour = parseInt(timeMatch[1]);
-        const startMinute = parseInt(timeMatch[2]);
-        const endHour = parseInt(timeMatch[3]);
-        const endMinute = parseInt(timeMatch[4]);
-        
-        const shiftDate = new Date(year, month, day);
-        const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
-        const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-        
-        shifts.push({
-          id: Date.now() + Math.random().toString(),
-          date: shiftDate,
-          startTime: startTimeStr,
-          endTime: endTimeStr,
-        });
+      const match = trimmedLine.match(shiftRegex);
+      
+      if (match) {
+        try {
+          const day = parseInt(match[1]);
+          const month = parseInt(match[2]) - 1; // JS months are 0-indexed
+          const year = parseInt(match[3]);
+          
+          const startHour = parseInt(match[4]);
+          const startMinute = parseInt(match[5]);
+          const endHour = parseInt(match[6]);
+          const endMinute = parseInt(match[7]);
+          
+          const shiftDate = new Date(year, month, day);
+          const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
+          const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+          
+          // Skip invalid dates
+          if (isNaN(shiftDate.getTime())) {
+            failedLines.push(`Line ${index + 1}: Invalid date`);
+            return;
+          }
+          
+          successfulShifts.push({
+            id: Date.now() + Math.random().toString(),
+            date: shiftDate,
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+          });
+        } catch (error) {
+          failedLines.push(`Line ${index + 1}: ${error}`);
+        }
+      } else {
+        failedLines.push(`Line ${index + 1}: Could not parse shift data`);
       }
     });
     
     // Add all parsed shifts
-    shifts.forEach(shift => onAddShift(shift));
+    if (successfulShifts.length > 0) {
+      successfulShifts.forEach(shift => onAddShift(shift));
+      
+      toast({
+        title: `Successfully added ${successfulShifts.length} shifts`,
+        description: failedLines.length > 0 
+          ? `Failed to parse ${failedLines.length} lines. Check format.` 
+          : "All shifts were successfully added.",
+        variant: successfulShifts.length > 0 ? "default" : "destructive",
+      });
+    } else {
+      toast({
+        title: "No shifts could be added",
+        description: "Check your input format. Expected format: DD.MM.YYYY HH:MM-HH:MM",
+        variant: "destructive",
+      });
+    }
     
-    // Clear import text
+    // Clear import text after processing
     setImportText("");
+  };
+
+  const handlePasteClick = () => {
+    // Show the sheet by triggering a click on the sheet trigger
+    const sheetTriggerElement = document.getElementById('batch-add-trigger');
+    if (sheetTriggerElement) {
+      sheetTriggerElement.click();
+    }
+    
+    // Focus the textarea after a short delay to allow the sheet to open
+    setTimeout(() => {
+      const textareaElement = document.getElementById('import-textarea');
+      if (textareaElement) {
+        textareaElement.focus();
+        
+        // Try to access clipboard
+        navigator.clipboard.readText()
+          .then(text => {
+            setImportText(text);
+          })
+          .catch(() => {
+            // If clipboard access is denied, just focus the textarea
+            console.log("Clipboard access denied. Please paste manually.");
+          });
+      }
+    }, 300);
   };
 
   return (
@@ -278,8 +348,8 @@ const ShiftForm: React.FC<ShiftFormProps> = ({ onAddShift, shifts }) => {
           </div>
         </div>
 
-        <div className="flex space-x-2">
-          <Button type="submit" className="flex-1 bg-coop-primary hover:bg-coop-primary/90">
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" className="bg-coop-primary hover:bg-coop-primary/90">
             <Plus className="mr-2 h-4 w-4" /> Add Shift
           </Button>
           
@@ -294,89 +364,102 @@ const ShiftForm: React.FC<ShiftFormProps> = ({ onAddShift, shifts }) => {
 
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline">
+              <Button id="batch-add-trigger" variant="outline">
                 <Clock className="mr-2 h-4 w-4" /> Batch Add
               </Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Add Multiple Shifts</SheetTitle>
                 <SheetDescription>
-                  Select multiple dates and set a time for all shifts
+                  Select multiple dates or paste shift data
                 </SheetDescription>
               </SheetHeader>
               
-              <div className="mt-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Select Dates</label>
-                  <p className="text-xs text-muted-foreground">
-                    Click dates to select/deselect them
-                  </p>
-                  <Calendar
-                    mode="multiple"
-                    selected={batchDates}
-                    onSelect={setBatchDates}
-                    className="rounded-md border w-full"
-                  />
-                  <div className="text-sm mt-2">
-                    {batchDates.length} date(s) selected
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+              <div className="mt-6 space-y-6">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium">Start Time</label>
-                    <Input
-                      type="time"
-                      value={batchStartTime}
-                      onChange={(e) => setBatchStartTime(e.target.value)}
+                    <label className="block text-sm font-medium">Import from Text</label>
+                    <p className="text-xs text-muted-foreground">
+                      Paste shift data in format: DD.MM.YYYY HH:MM-HH:MM
+                    </p>
+                    <Textarea
+                      id="import-textarea"
+                      className="min-h-[200px] w-full font-mono text-sm"
+                      value={importText}
+                      onChange={(e) => setImportText(e.target.value)}
+                      placeholder="01.02.2025 12:00-19:00&#10;02.02.2025 09:30-16:00"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">End Time</label>
-                    <Input
-                      type="time"
-                      value={batchEndTime}
-                      onChange={(e) => setBatchEndTime(e.target.value)}
-                    />
-                  </div>
+                  <Button 
+                    onClick={parseTextImport} 
+                    className="w-full bg-coop-primary hover:bg-coop-primary/90"
+                    disabled={!importText.trim()}
+                  >
+                    <ClipboardPaste className="mr-2 h-4 w-4" />
+                    Parse & Add Shifts
+                  </Button>
                 </div>
-                
-                <Button 
-                  onClick={handleBatchAdd} 
-                  className="w-full bg-coop-primary hover:bg-coop-primary/90"
-                  disabled={batchDates.length === 0}
-                >
-                  Add {batchDates.length} Shifts
-                </Button>
-              </div>
 
-              <Separator className="my-4" />
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Import from Text</label>
-                  <p className="text-xs text-muted-foreground">
-                    Paste text containing dates and times (e.g., "12/05 15:00-23:00")
-                  </p>
-                  <textarea
-                    className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    placeholder="12/05 15:00-23:00&#10;13/05 08:00-16:00"
-                  />
+                <Separator className="my-4" />
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium">Select Dates</label>
+                    <p className="text-xs text-muted-foreground">
+                      Click dates to select/deselect them
+                    </p>
+                    <Calendar
+                      mode="multiple"
+                      selected={batchDates}
+                      onSelect={setBatchDates}
+                      className="rounded-md border w-full"
+                    />
+                    <div className="text-sm mt-2">
+                      {batchDates.length} date(s) selected
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Start Time</label>
+                      <Input
+                        type="time"
+                        value={batchStartTime}
+                        onChange={(e) => setBatchStartTime(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">End Time</label>
+                      <Input
+                        type="time"
+                        value={batchEndTime}
+                        onChange={(e) => setBatchEndTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    onClick={handleBatchAdd} 
+                    className="w-full"
+                    disabled={batchDates.length === 0}
+                    variant="outline"
+                  >
+                    Add {batchDates.length} Shifts
+                  </Button>
                 </div>
-                <Button 
-                  onClick={parseTextImport} 
-                  className="w-full"
-                  disabled={!importText.trim()}
-                  variant="outline"
-                >
-                  Parse & Add Shifts
-                </Button>
               </div>
             </SheetContent>
           </Sheet>
+          
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handlePasteClick}
+            className="whitespace-nowrap"
+          >
+            <ClipboardPaste className="mr-2 h-4 w-4" /> Quick Paste
+          </Button>
         </div>
       </form>
     </div>
