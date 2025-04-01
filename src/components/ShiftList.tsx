@@ -4,6 +4,14 @@ import { WorkShift } from "@/utils/payCalculator";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { X } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 
 interface ShiftListProps {
   shifts: WorkShift[];
@@ -22,33 +30,25 @@ const ShiftList: React.FC<ShiftListProps> = ({ shifts, onDeleteShift }) => {
   return (
     <div className="space-y-2">
       <h3 className="font-medium text-lg">Your Shifts</h3>
-      <div className="rounded-md border overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Start Time
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                End Time
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-card divide-y divide-gray-200">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[180px]">Date</TableHead>
+              <TableHead>Start Time</TableHead>
+              <TableHead>End Time</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {shifts.map((shift) => (
-              <tr key={shift.id}>
-                <td className="px-4 py-3 text-sm">
+              <TableRow key={shift.id}>
+                <TableCell>
                   {format(shift.date, "EEE, MMM d, yyyy")}
-                </td>
-                <td className="px-4 py-3 text-sm">{shift.startTime}</td>
-                <td className="px-4 py-3 text-sm">{shift.endTime}</td>
-                <td className="px-4 py-3 text-sm text-right">
+                </TableCell>
+                <TableCell>{shift.startTime}</TableCell>
+                <TableCell>{shift.endTime}</TableCell>
+                <TableCell className="text-right">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -57,11 +57,11 @@ const ShiftList: React.FC<ShiftListProps> = ({ shifts, onDeleteShift }) => {
                   >
                     <X className="h-4 w-4 text-destructive" />
                   </Button>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
