@@ -27,6 +27,14 @@ const Index = () => {
     updateCalculation(updatedShifts, taxPercentage);
   };
 
+  const handleEditShift = (updatedShift: WorkShift) => {
+    const updatedShifts = shifts.map((shift) => 
+      shift.id === updatedShift.id ? updatedShift : shift
+    );
+    setShifts(updatedShifts);
+    updateCalculation(updatedShifts, taxPercentage);
+  };
+
   const handleTaxChange = (value: number[]) => {
     const newTaxPercentage = value[0];
     setTaxPercentage(newTaxPercentage);
@@ -66,7 +74,11 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            <ShiftList shifts={shifts} onDeleteShift={handleDeleteShift} />
+            <ShiftList 
+              shifts={shifts} 
+              onDeleteShift={handleDeleteShift} 
+              onEditShift={handleEditShift}
+            />
           </div>
 
           <div className="space-y-6">
